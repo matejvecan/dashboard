@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Matěj Dashboard"/>
+<title>Matěj Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --bg:#0e0e0f;--bg2:#161618;--bg3:#1e1e21;--border:#2a2a2e;
+  --text:#e8e8ea;--text2:#8a8a9a;--text3:#4a4a5a;
+  --green:#1DB87A;--green-dim:rgba(29,184,122,0.12);
+  --red:#e05c5c;--red-dim:rgba(224,92,92,0.12);
+  --orange:#e0a85c;--orange-dim:rgba(224,168,92,0.12);
+  --blue:#5b9cf6;--blue-dim:rgba(91,156,246,0.12);
+  --radius:16px;--radius-sm:9px;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+
+/* PIN LOCK */
+#pinOverlay{position:fixed;inset:0;background:rgba(10,10,11,0.97);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;}
+#pinOverlay h2{font-size:20px;font-weight:500;}
+#pinOverlay p{font-size:13px;color:var(--text2);font-family:var(--mono);}
+.pin-dots{display:flex;gap:12px;margin:8px 0;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);background:transparent;transition:background 0.15s;}
+.pin-dot.filled{background:var(--green);border-color:var(--green);}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:240px;}
+.pin-btn{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:20px;font-weight:500;padding:18px;cursor:pointer;transition:background 0.15s;}
+.pin-btn:hover{background:var(--bg3);}
+.pin-error{color:var(--red);font-size:12px;font-family:var(--mono);height:16px;}
+.pin-setup{display:flex;flex-direction:column;align-items:center;gap:12px;width:260px;}
+.pin-setup input{text-align:center;letter-spacing:0.3em;font-size:18px;}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(14,14,15,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;}
+.topbar-date{font-family:var(--mono);font-size:11px;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;}
+.topbar-greeting{font-size:17px;font-weight:500;margin-top:2px;}
+.topbar-greeting span{color:var(--green);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.gcal-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);}
+.gcal-dot.connected{background:var(--green);}
+.gcal-label{font-family:var(--mono);font-size:11px;color:var(--text3);}
+
+/* LAYOUT */
+.main{padding:16px;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media(max-width:900px){.main{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:580px){.main{grid-template-columns:1fr;}}
+.widget{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:10px;}
+.widget-wide{grid-column:span 2;}
+@media(max-width:580px){.widget-wide{grid-column:span 1;}}
+.widget-full{grid-column:span 3;}
+@media(max-width:900px){.widget-full{grid-column:span 2;}}
+@media(max-width:580px){.widget-full{grid-column:span 1;}}
+.widget-title{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);display:flex;align-items:center;justify-content:space-between;}
+
+/* INPUTS */
+input[type=text],input[type=number],textarea,select{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:13px;padding:7px 10px;outline:none;transition:border-color 0.15s;width:100%;}
+input[type=text]:focus,input[type=number]:focus,textarea:focus{border-color:var(--green);}
+select option{background:var(--bg3);}
+.btn-icon{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:18px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:border-color 0.15s,color 0.15s;line-height:1;}
+.btn-icon:hover{border-color:var(--green);color:var(--green);}
+.btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:13px;padding:7px 14px;cursor:pointer;transition:border-color 0.15s;white-space:nowrap;}
+.btn:hover{border-color:var(--green);}
+.btn-green{background:var(--green);border-color:var(--green);color:#000;font-weight:600;}
+.btn-green:hover{background:#18a86e;}
+.row{display:flex;gap:7px;align-items:center;}
+.row input{flex:1;}
+.empty{font-size:12px;color:var(--text3);text-align:center;padding:12px 0;font-family:var(--mono);}
+.divider{height:1px;background:var(--border);}
+.del-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:15px;padding:0 2px;flex-shrink:0;}
+.del-btn:hover{color:var(--red);}
+
+/* TODO with priority */
+.todo-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.todo-item:last-child{border-bottom:none;}
+.todo-cb{width:15px;height:15px;cursor:pointer;accent-color:var(--green);flex-shrink:0;}
+.todo-text{flex:1;line-height:1.4;}
+.todo-text.done{text-decoration:line-through;color:var(--text3);}
+.priority-flag{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.p-high{background:var(--red);}
+.p-mid{background:var(--orange);}
+.p-low{background:var(--blue);}
+.priority-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;border-radius:4px;color:var(--text3);}
+
+/* HABITS */
+.habit-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);}
+.habit-row:last-child{border-bottom:none;}
+.habit-name{font-size:13px;flex:1;}
+.habit-streak{font-family:var(--mono);font-size:11px;color:var(--orange);margin-right:8px;}
+.habit-check{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all 0.15s;flex-shrink:0;}
+.habit-check.done{background:var(--green);border-color:var(--green);color:#000;}
+
+/* HABIT HISTORY CALENDAR */
+.habit-history{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
+.hday{width:14px;height:14px;border-radius:3px;background:var(--bg3);}
+.hday.active{background:var(--green);}
+.hday.partial{background:var(--orange);}
+
+/* CALENDAR */
+.cal-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.cal-item:last-child{border-bottom:none;}
+.cal-time{font-family:var(--mono);font-size:11px;color:var(--text3);min-width:38px;}
+.cal-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.gcal-connect-box{background:var(--bg3);border:1px dashed var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center;}
+.gcal-connect-box p{font-size:12px;color:var(--text2);margin-bottom:10px;font-family:var(--mono);}
+
+/* FOOD */
+.macro-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.macro-box{background:var(--bg3);border-radius:var(--radius-sm);padding:8px 6px;text-align:center;}
+.macro-num{font-size:17px;font-weight:600;font-family:var(--mono);}
+.macro-lbl{font-size:10px;color:var(--text2);margin-top:1px;}
+.prog-bar{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;}
+.prog-fill{height:100%;background:var(--green);border-radius:2px;transition:width 0.3s;}
+.food-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.food-item:last-child{border-bottom:none;}
+.stats-row{display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono);color:var(--text3);}
+
+/* NETWORTH */
+.nw-total{font-family:var(--mono);font-size:28px;font-weight:500;transition:filter 0.2s;line-height:1.2;}
+.nw-total.hidden{filter:blur(10px);user-select:none;}
+.nw-item{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.nw-item:last-child{border-bottom:none;}
+.nw-val{font-family:var(--mono);font-size:13px;}
+.nw-val.hidden{filter:blur(6px);user-select:none;}
+.badge{font-size:9px;font-family:var(--mono);padding:2px 6px;border-radius:20px;margin-left:6px;text-transform:uppercase;letter-spacing:0.06em;}
+.badge.asset{background:var(--green-dim);color:var(--green);}
+.badge.liability{background:var(--red-dim);color:var(--red);}
+
+/* NW CHART */
+#nwChart{width:100%;height:120px;}
+
+/* JOURNAL */
+.journal-area{width:100%;min-height:120px;font-size:13px;line-height:1.7;font-family:var(--font);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:10px 12px;resize:vertical;}
+.journal-area:focus{border-color:var(--green);outline:none;}
+.saved-msg{font-size:11px;color:var(--green);font-family:var(--mono);display:none;}
+</style>
+</head>
+<body>
+
+<!-- PIN OVERLAY -->
+<div id="pinOverlay">
+  <div id="pinSetupView" style="display:none;" class="pin-setup">
+    <h2>Nastav PIN</h2>
+    <p>// zvol 4-místný PIN pro přístup</p>
+    <input type="password" id="pinSetupInput" maxlength="4" placeholder="····" inputmode="numeric"/>
+    <input type="password" id="pinSetupConfirm" maxlength="4" placeholder="Potvrď PIN" inputmode="numeric"/>
+    <button class="btn btn-green" onclick="setupPin()" style="width:100%;">Nastavit PIN</button>
+    <p id="pinSetupErr" class="pin-error"></p>
+  </div>
+  <div id="pinLoginView" style="display:none;">
+    <h2>Matěj Dashboard</h2>
+    <p>// zadej PIN pro přístup</p>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinInput('1')">1</button>
+      <button class="pin-btn" onclick="pinInput('2')">2</button>
+      <button class="pin-btn" onclick="pinInput('3')">3</button>
+      <button class="pin-btn" onclick="pinInput('4')">4</button>
+      <button class="pin-btn" onclick="pinInput('5')">5</button>
+      <button class="pin-btn" onclick="pinInput('6')">6</button>
+      <button class="pin-btn" onclick="pinInput('7')">7</button>
+      <button class="pin-btn" onclick="pinInput('8')">8</button>
+      <button class="pin-btn" onclick="pinInput('9')">9</button>
+      <button class="pin-btn" onclick="pinInput('')" style="font-size:14px;color:var(--text2);">⌫</button>
+      <button class="pin-btn" onclick="pinInput('0')">0</button>
+      <button class="pin-btn" onclick="pinInput('')" style="font-size:14px;color:var(--text2);">✕</button>
+    </div>
+    <p id="pinErr" class="pin-error"></p>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div>
+    <div class="topbar-date" id="topDate"></div>
+    <div class="topbar-greeting">Ahoj, <span>Matěji</span> 👋</div>
+  </div>
+  <div class="topbar-right">
+    <div class="gcal-dot" id="gcalDot"></div>
+    <span class="gcal-label" id="gcalLabel">Kalendář nepřipojen</span>
+    <button class="btn" id="gcalBtn" onclick="handleGcalAuth()" style="font-size:11px;padding:4px 10px;">Přihlásit Google</button>
+    <button class="btn" onclick="lockApp()" style="font-size:11px;padding:4px 10px;">🔒</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- TODO -->
+  <div class="widget">
+    <div class="widget-title">✓ Úkoly dnes</div>
+    <div class="row">
+      <input type="text" id="todoInput" placeholder="Přidat úkol..."/>
+      <select id="todoPriority" style="width:90px;flex:none;">
+        <option value="high">🔴 Vysoká</option>
+        <option value="mid" selected>🟠 Střední</option>
+        <option value="low">🔵 Nízká</option>
+      </select>
+      <button class="btn-icon" onclick="addTodo()">+</button>
+    </div>
+    <div id="todoList"></div>
+  </div>
+
+  <!-- HABITS -->
+  <div class="widget">
+    <div class="widget-title">
+      <span>◎ Návyky</span>
+      <button class="btn" onclick="toggleHabitHistory()" style="font-size:10px;padding:3px 8px;">Historie</button>
+    </div>
+    <div id="habitList"></div>
+    <div id="habitHistorySection" style="display:none;">
+      <div class="divider"></div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:8px;margin-bottom:6px;">POSLEDNÍCH 30 DNÍ</div>
+      <div id="habitHistoryGrid"></div>
+    </div>
+    <div class="divider"></div>
+    <div class="row">
+      <input type="text" id="habitInput" placeholder="Nový návyk..."/>
+      <button class="btn-icon" onclick="addHabit()">+</button>
+    </div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div class="widget">
+    <div class="widget-title">
+      <span>◷ Kalendář</span>
+      <button class="btn-icon" onclick="fetchGcalEvents()" title="Obnovit" style="font-size:13px;">↻</button>
+    </div>
+    <div id="calContainer">
+      <div class="gcal-connect-box"><p>// Klikni "Přihlásit Google" nahoře</p></div>
+    </div>
+    <div class="divider"></div>
+    <div class="row">
+      <input type="text" id="calTime" placeholder="Čas" style="width:65px;flex:none;"/>
+      <input type="text" id="calName" placeholder="Přidat událost..." style="flex:1;"/>
+      <button class="btn-icon" onclick="addCal()">+</button>
+    </div>
+    <div id="manualCalList"></div>
+  </div>
+
+  <!-- FOOD -->
+  <div class="widget widget-wide">
+    <div class="widget-title">⬡ Tracking jídla</div>
+    <div class="macro-grid">
+      <div class="macro-box"><div class="macro-num" id="fCal">0</div><div class="macro-lbl">kcal</div></div>
+      <div class="macro-box"><div class="macro-num" id="fProt">0g</div><div class="macro-lbl">bílkoviny</div></div>
+      <div class="macro-box"><div class="macro-num" id="fCarb">0g</div><div class="macro-lbl">sacharidy</div></div>
+      <div class="macro-box"><div class="macro-num" id="fFat">0g</div><div class="macro-lbl">tuky</div></div>
+    </div>
+    <div class="prog-bar"><div class="prog-fill" id="calProg" style="width:0%"></div></div>
+    <div class="stats-row"><span>Cíl: 2500 kcal</span><span id="calLeft">2500 zbývá</span></div>
+    <div id="foodList"></div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;">
+      <input type="text" id="fName" placeholder="Jídlo..." style="flex:2;min-width:100px;"/>
+      <input type="number" id="fCalIn" placeholder="kcal" style="width:68px;flex:none;"/>
+      <input type="number" id="fProtIn" placeholder="B g" style="width:58px;flex:none;"/>
+      <input type="number" id="fCarbIn" placeholder="S g" style="width:58px;flex:none;"/>
+      <input type="number" id="fFatIn" placeholder="T g" style="width:58px;flex:none;"/>
+      <button class="btn-icon" onclick="addFood()">+</button>
+    </div>
+  </div>
+
+  <!-- NETWORTH -->
+  <div class="widget">
+    <div class="widget-title">
+      <span>◈ Čisté jmění</span>
+      <button class="btn" onclick="toggleNW()" id="nwBtn" style="font-size:10px;padding:3px 8px;">Zobrazit</button>
+    </div>
+    <div class="nw-total hidden" id="nwTotal">0 Kč</div>
+    <canvas id="nwChart"></canvas>
+    <div id="nwList"></div>
+    <div class="divider"></div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;">
+      <input type="text" id="nwName" placeholder="Název..." style="flex:1;min-width:80px;"/>
+      <input type="number" id="nwVal" placeholder="Kč" style="width:88px;flex:none;"/>
+      <select id="nwType" style="width:100px;flex:none;">
+        <option value="asset">Aktivum</option>
+        <option value="liability">Závazek</option>
+      </select>
+      <button class="btn-icon" onclick="addNW()">+</button>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">Zaznamenat snapshot pro graf:</div>
+    <button class="btn" onclick="saveNWSnapshot()" style="font-size:11px;">📸 Uložit dnešní hodnotu</button>
+  </div>
+
+  <!-- FINANCE -->
+  <div class="widget widget-wide">
+    <div class="widget-title">
+      <span>₿ Finance — <span id="finMonth"></span></span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text3);">Cíl: 100 000 Kč</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      <div class="macro-box" style="border:1px solid var(--green-dim);">
+        <div class="macro-num" id="finIncome" style="color:var(--green);">0 Kč</div>
+        <div class="macro-lbl">Příjmy</div>
+      </div>
+      <div class="macro-box" style="border:1px solid var(--red-dim);">
+        <div class="macro-num" id="finExpense" style="color:var(--red);">0 Kč</div>
+        <div class="macro-lbl">Výdaje</div>
+      </div>
+      <div class="macro-box">
+        <div class="macro-num" id="finProfit">0 Kč</div>
+        <div class="macro-lbl">Čistý zisk</div>
+      </div>
+    </div>
+    <div class="prog-bar"><div class="prog-fill" id="finProg" style="width:0%;background:var(--green)"></div></div>
+    <div class="stats-row"><span id="finPct">0% z cíle</span><span id="finLeft">100 000 zbývá</span></div>
+    <div id="finList"></div>
+    <div class="divider"></div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;">
+      <input type="text" id="finName" placeholder="Popis (provize, nájem...)" style="flex:2;min-width:120px;"/>
+      <input type="number" id="finVal" placeholder="Kč" style="width:100px;flex:none;"/>
+      <select id="finType" style="width:110px;flex:none;">
+        <option value="income">Příjem</option>
+        <option value="expense">Výdaj</option>
+      </select>
+      <button class="btn-icon" onclick="addFin()">+</button>
+    </div>
+  </div>
+
+  <!-- JOURNAL -->
+  <div class="widget widget-wide">
+    <div class="widget-title">✎ Journaling</div>
+    <textarea class="journal-area" id="journalText" placeholder="Jak byl tvůj den? Co tě napadá..."></textarea>
+    <div class="row">
+      <button class="btn btn-green" onclick="saveJournal()">Uložit</button>
+      <span class="saved-msg" id="savedMsg">✓ Uloženo</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── PIN ───────────────────────────────────────────────────
+const STORED_PIN_KEY='dashboard_pin';
+let pinBuffer='';
+let pinUnlocked=false;
+
+function initPin(){
+  const pin=localStorage.getItem(STORED_PIN_KEY);
+  if(!pin){document.getElementById('pinSetupView').style.display='flex';document.getElementById('pinSetupView').style.flexDirection='column';document.getElementById('pinSetupView').style.alignItems='center';document.getElementById('pinSetupView').style.gap='12px';}
+  else{document.getElementById('pinLoginView').style.display='block';}
+}
+
+function setupPin(){
+  const a=document.getElementById('pinSetupInput').value;
+  const b=document.getElementById('pinSetupConfirm').value;
+  if(a.length!==4||!/^\d{4}$/.test(a)){document.getElementById('pinSetupErr').textContent='PIN musí být 4 číslice';return;}
+  if(a!==b){document.getElementById('pinSetupErr').textContent='PINy se neshodují';return;}
+  localStorage.setItem(STORED_PIN_KEY,btoa(a));
+  unlockApp();
+}
+
+function pinInput(d){
+  if(d===''){pinBuffer=pinBuffer.slice(0,-1);}
+  else if(pinBuffer.length<4){pinBuffer+=d;}
+  updatePinDots();
+  if(pinBuffer.length===4){
+    const stored=localStorage.getItem(STORED_PIN_KEY);
+    if(btoa(pinBuffer)===stored){unlockApp();}
+    else{document.getElementById('pinErr').textContent='Špatný PIN';setTimeout(()=>{pinBuffer='';updatePinDots();document.getElementById('pinErr').textContent='';},800);}
+  }
+}
+
+function updatePinDots(){
+  const dots=document.querySelectorAll('.pin-dot');
+  dots.forEach((d,i)=>d.classList.toggle('filled',i<pinBuffer.length));
+}
+
+function unlockApp(){
+  pinUnlocked=true;
+  document.getElementById('pinOverlay').style.display='none';
+  initApp();
+}
+
+function lockApp(){
+  pinUnlocked=false;
+  pinBuffer='';
+  updatePinDots();
+  document.getElementById('pinOverlay').style.display='flex';
+  document.getElementById('pinLoginView').style.display='block';
+  document.getElementById('pinSetupView').style.display='none';
+}
+
+// ── INIT ─────────────────────────────────────────────────
+const today=new Date();
+const days=['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'];
+const months=['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince'];
+const todayKey=today.toISOString().slice(0,10);
+const monthKey=today.toISOString().slice(0,7);
+document.getElementById('topDate').textContent=days[today.getDay()]+', '+today.getDate()+'. '+months[today.getMonth()]+' '+today.getFullYear();
+
+const get=(k,def)=>{try{return JSON.parse(localStorage.getItem(k))??def;}catch{return def;}};
+const set=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+
+function initApp(){
+  renderTodos();renderHabits();renderManualCal();renderFood();renderNW();renderFin();renderJournal();
+  window.addEventListener('load',initGcal);
+  if(typeof google!=='undefined')initGcal();
+}
+
+// ── GCAL ─────────────────────────────────────────────────
+const GCAL_CLIENT_ID='1049447908031-aetudtr54i1jss59sicbrf0c2qedoe0n.apps.googleusercontent.com';
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.readonly';
+let gcalToken=localStorage.getItem('gcal_token')||null;
+let tokenClient;
+
+function initGcal(){
+  if(typeof google==='undefined'){setTimeout(initGcal,500);return;}
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:GCAL_CLIENT_ID,scope:GCAL_SCOPE,callback:(resp)=>{if(resp.error)return;gcalToken=resp.access_token;localStorage.setItem('gcal_token',gcalToken);updateGcalStatus(true);fetchGcalEvents();}});
+  if(gcalToken){updateGcalStatus(true);fetchGcalEvents();}
+}
+function handleGcalAuth(){if(!gcalToken){tokenClient.requestAccessToken();}else{gcalToken=null;localStorage.removeItem('gcal_token');updateGcalStatus(false);document.getElementById('calContainer').innerHTML='<div class="gcal-connect-box"><p>// Klikni "Přihlásit Google" nahoře</p></div>';}}
+function updateGcalStatus(c){document.getElementById('gcalDot').className='gcal-dot'+(c?' connected':'');document.getElementById('gcalLabel').textContent=c?'Kalendář připojen':'Kalendář nepřipojen';document.getElementById('gcalBtn').textContent=c?'Odpojit':'Přihlásit Google';}
+const calColors=['#1DB87A','#5b9cf6','#e0a85c','#c45bf6','#e05c5c'];
+async function fetchGcalEvents(){
+  if(!gcalToken)return;
+  try{
+    const start=new Date(today);start.setHours(0,0,0,0);
+    const end=new Date(today);end.setHours(23,59,59,999);
+    const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${start.toISOString()}&timeMax=${end.toISOString()}&singleEvents=true&orderBy=startTime`;
+    const res=await fetch(url,{headers:{Authorization:`Bearer ${gcalToken}`}});
+    if(res.status===401){gcalToken=null;localStorage.removeItem('gcal_token');updateGcalStatus(false);return;}
+    const data=await res.json();
+    const el=document.getElementById('calContainer');
+    if(!data.items||!data.items.length){el.innerHTML='<div class="empty">// dnes nic v kalendáři</div>';return;}
+    el.innerHTML=data.items.map((item,i)=>{
+      const start=item.start.dateTime||item.start.date;
+      const time=start.includes('T')?new Date(start).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}):'celý den';
+      return`<div class="cal-item"><span class="cal-time">${time}</span><span class="cal-dot" style="background:${calColors[i%5]}"></span><span style="flex:1;">${item.summary||'Bez názvu'}</span></div>`;
+    }).join('');
+  }catch(e){console.log('GCal error',e);}
+}
+let manualCal=get('manualCal_'+todayKey,[]);
+function renderManualCal(){const el=document.getElementById('manualCalList');if(!manualCal.length){el.innerHTML='';return;}el.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px;">VLASTNÍ</div>'+manualCal.map((e,i)=>`<div class="cal-item"><span class="cal-time">${e.time}</span><span class="cal-dot" style="background:${calColors[i%5]}"></span><span style="flex:1;">${e.name}</span><button class="del-btn" onclick="deleteCal(${i})">×</button></div>`).join('');}
+function addCal(){const t=document.getElementById('calTime').value.trim();const n=document.getElementById('calName').value.trim();if(!t||!n)return;manualCal.push({time:t,name:n});set('manualCal_'+todayKey,manualCal);renderManualCal();document.getElementById('calTime').value='';document.getElementById('calName').value='';}
+function deleteCal(i){manualCal.splice(i,1);set('manualCal_'+todayKey,manualCal);renderManualCal();}
+
+// ── TODO ─────────────────────────────────────────────────
+let todos=get('todos_'+todayKey,[]);
+const priorityColors={high:'var(--red)',mid:'var(--orange)',low:'var(--blue)'};
+function renderTodos(){
+  const el=document.getElementById('todoList');
+  if(!todos.length){el.innerHTML='<div class="empty">// žádné úkoly</div>';return;}
+  const sorted=[...todos].map((t,i)=>({...t,_i:i})).sort((a,b)=>{const o={high:0,mid:1,low:2};return o[a.priority||'mid']-o[b.priority||'mid'];});
+  el.innerHTML=sorted.map(t=>`
+    <div class="todo-item">
+      <div class="priority-flag" style="background:${priorityColors[t.priority||'mid']}"></div>
+      <input type="checkbox" class="todo-cb" ${t.done?'checked':''} onchange="toggleTodo(${t._i})"/>
+      <span class="todo-text ${t.done?'done':''}">${t.text}</span>
+      <button class="del-btn" onclick="deleteTodo(${t._i})">×</button>
+    </div>`).join('');
+}
+function addTodo(){const inp=document.getElementById('todoInput');const v=inp.value.trim();const p=document.getElementById('todoPriority').value;if(!v)return;todos.push({text:v,done:false,priority:p});set('todos_'+todayKey,todos);renderTodos();inp.value='';}
+function toggleTodo(i){todos[i].done=!todos[i].done;set('todos_'+todayKey,todos);renderTodos();}
+function deleteTodo(i){todos.splice(i,1);set('todos_'+todayKey,todos);renderTodos();}
+document.getElementById('todoInput').addEventListener('keydown',e=>{if(e.key==='Enter')addTodo();});
+
+// ── HABITS ───────────────────────────────────────────────
+let habits=get('habits',[{name:'Meditace'},{name:'Gym'},{name:'Čtení'},{name:'Splnění všech úkolů'},{name:'Zdravé jídlo'}]);
+let habitDone=get('habitDone_'+todayKey,{});
+let historyVisible=false;
+
+function getStreak(habitIdx){
+  let streak=0;
+  const d=new Date(today);
+  d.setDate(d.getDate()-1);
+  while(true){
+    const k=d.toISOString().slice(0,10);
+    const done=get('habitDone_'+k,{});
+    if(done[habitIdx]){streak++;d.setDate(d.getDate()-1);}
+    else break;
+    if(streak>365)break;
+  }
+  if(habitDone[habitIdx])streak++;
+  return streak;
+}
+
+function renderHabits(){
+  const el=document.getElementById('habitList');
+  if(!habits.length){el.innerHTML='<div class="empty">// žádné návyky</div>';return;}
+  el.innerHTML=habits.map((h,i)=>{
+    const streak=getStreak(i);
+    return`<div class="habit-row">
+      <span class="habit-name">${h.name}</span>
+      ${streak>1?`<span class="habit-streak">🔥${streak}</span>`:''}
+      <div class="habit-check ${habitDone[i]?'done':''}" onclick="toggleHabit(${i})">${habitDone[i]?'✓':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleHabit(i){habitDone[i]=!habitDone[i];set('habitDone_'+todayKey,habitDone);renderHabits();}
+function addHabit(){const inp=document.getElementById('habitInput');const v=inp.value.trim();if(!v)return;habits.push({name:v});set('habits',habits);renderHabits();inp.value='';}
+document.getElementById('habitInput').addEventListener('keydown',e=>{if(e.key==='Enter')addHabit();});
+
+function toggleHabitHistory(){
+  historyVisible=!historyVisible;
+  document.getElementById('habitHistorySection').style.display=historyVisible?'block':'none';
+  if(historyVisible)renderHabitHistory();
+}
+
+function renderHabitHistory(){
+  const el=document.getElementById('habitHistoryGrid');
+  const days30=[];
+  for(let i=29;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);days30.push(d.toISOString().slice(0,10));}
+  el.innerHTML=habits.map((h,hi)=>{
+    const dots=days30.map(dk=>{
+      const done=get('habitDone_'+dk,{});
+      const cls=done[hi]?'hday active':'hday';
+      return`<div class="${cls}" title="${dk}"></div>`;
+    }).join('');
+    return`<div style="margin-bottom:8px;">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">${h.name}</div>
+      <div class="habit-history">${dots}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── FOOD ─────────────────────────────────────────────────
+let foods=get('foods_'+todayKey,[]);
+const CAL_GOAL=2500;
+function renderFood(){
+  const totCal=foods.reduce((s,f)=>s+(f.cal||0),0);
+  const totProt=foods.reduce((s,f)=>s+(f.prot||0),0);
+  const totCarb=foods.reduce((s,f)=>s+(f.carb||0),0);
+  const totFat=foods.reduce((s,f)=>s+(f.fat||0),0);
+  document.getElementById('fCal').textContent=totCal;
+  document.getElementById('fProt').textContent=totProt+'g';
+  document.getElementById('fCarb').textContent=totCarb+'g';
+  document.getElementById('fFat').textContent=totFat+'g';
+  document.getElementById('calProg').style.width=Math.min(100,Math.round(totCal/CAL_GOAL*100))+'%';
+  document.getElementById('calLeft').textContent=Math.max(0,CAL_GOAL-totCal)+' zbývá';
+  const el=document.getElementById('foodList');
+  if(!foods.length){el.innerHTML='<div class="empty">// zatím nic</div>';return;}
+  el.innerHTML=foods.map((f,i)=>`<div class="food-item"><span>${f.name}</span><span style="color:var(--text2);font-family:var(--mono);font-size:11px;">${f.cal} kcal${f.prot?` · ${f.prot}g B`:''} <button class="del-btn" onclick="deleteFood(${i})">×</button></span></div>`).join('');
+}
+function addFood(){const n=document.getElementById('fName').value.trim();const c=parseInt(document.getElementById('fCalIn').value)||0;const p=parseInt(document.getElementById('fProtIn').value)||0;const cb=parseInt(document.getElementById('fCarbIn').value)||0;const ft=parseInt(document.getElementById('fFatIn').value)||0;if(!n||!c)return;foods.push({name:n,cal:c,prot:p,carb:cb,fat:ft});set('foods_'+todayKey,foods);renderFood();['fName','fCalIn','fProtIn','fCarbIn','fFatIn'].forEach(id=>document.getElementById(id).value='');}
+function deleteFood(i){foods.splice(i,1);set('foods_'+todayKey,foods);renderFood();}
+
+// ── NETWORTH + CHART ─────────────────────────────────────
+let nwItems=get('networth',[]);
+let nwSnapshots=get('nwSnapshots',[]);
+let nwVisible=false;
+
+function renderNW(){
+  const total=nwItems.reduce((s,i)=>i.type==='asset'?s+i.val:s-i.val,0);
+  const fmt=v=>v.toLocaleString('cs-CZ')+' Kč';
+  document.getElementById('nwTotal').textContent=fmt(total);
+  document.getElementById('nwTotal').className='nw-total'+(nwVisible?'':' hidden');
+  document.getElementById('nwBtn').textContent=nwVisible?'Skrýt':'Zobrazit';
+  const el=document.getElementById('nwList');
+  if(!nwItems.length){el.innerHTML='<div class="empty">// žádné položky</div>';}
+  else{el.innerHTML=nwItems.map((item,i)=>`<div class="nw-item"><span>${item.name}<span class="badge ${item.type}">${item.type==='asset'?'aktivum':'závazek'}</span></span><span><span class="nw-val${nwVisible?'':' hidden'}">${fmt(item.val)}</span> <button class="del-btn" onclick="deleteNW(${i})">×</button></span></div>`).join('');}
+  drawNWChart();
+}
+
+function drawNWChart(){
+  const canvas=document.getElementById('nwChart');
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.offsetWidth;const H=120;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  if(nwSnapshots.length<2){
+    ctx.fillStyle='#4a4a5a';ctx.font='12px DM Mono, monospace';ctx.textAlign='center';
+    ctx.fillText('// uložte alespoň 2 snapshoty pro graf',W/2,H/2);return;
+  }
+  const vals=nwSnapshots.map(s=>s.val);
+  const min=Math.min(...vals);const max=Math.max(...vals);
+  const range=max-min||1;
+  const pad=16;
+  const points=nwSnapshots.map((s,i)=>({x:pad+(i/(nwSnapshots.length-1))*(W-pad*2),y:H-pad-(s.val-min)/range*(H-pad*2)}));
+  // gradient fill
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(29,184,122,0.3)');grad.addColorStop(1,'rgba(29,184,122,0)');
+  ctx.beginPath();ctx.moveTo(points[0].x,H-pad);
+  points.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.lineTo(points[points.length-1].x,H-pad);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+  // line
+  ctx.beginPath();ctx.moveTo(points[0].x,points[0].y);
+  points.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle='#1DB87A';ctx.lineWidth=2;ctx.stroke();
+  // dots
+  points.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fillStyle='#1DB87A';ctx.fill();});
+}
+
+function saveNWSnapshot(){
+  const total=nwItems.reduce((s,i)=>i.type==='asset'?s+i.val:s-i.val,0);
+  const existing=nwSnapshots.findIndex(s=>s.date===todayKey);
+  if(existing>=0)nwSnapshots[existing].val=total;
+  else nwSnapshots.push({date:todayKey,val:total});
+  if(nwSnapshots.length>90)nwSnapshots=nwSnapshots.slice(-90);
+  set('nwSnapshots',nwSnapshots);
+  drawNWChart();
+}
+
+function toggleNW(){nwVisible=!nwVisible;renderNW();}
+function addNW(){const n=document.getElementById('nwName').value.trim();const v=parseInt(document.getElementById('nwVal').value)||0;const t=document.getElementById('nwType').value;if(!n||!v)return;nwItems.push({name:n,val:v,type:t});set('networth',nwItems);renderNW();document.getElementById('nwName').value='';document.getElementById('nwVal').value='';}
+function deleteNW(i){nwItems.splice(i,1);set('networth',nwItems);renderNW();}
+window.addEventListener('resize',drawNWChart);
+
+// ── FINANCE ──────────────────────────────────────────────
+const FIN_GOAL=100000;
+let finItems=get('finance_'+monthKey,[]);
+document.getElementById('finMonth').textContent=months[today.getMonth()]+' '+today.getFullYear();
+function renderFin(){
+  const totIncome=finItems.filter(f=>f.type==='income').reduce((s,f)=>s+f.val,0);
+  const totExpense=finItems.filter(f=>f.type==='expense').reduce((s,f)=>s+f.val,0);
+  const profit=totIncome-totExpense;
+  const fmt=v=>v.toLocaleString('cs-CZ')+' Kč';
+  document.getElementById('finIncome').textContent=fmt(totIncome);
+  document.getElementById('finExpense').textContent=fmt(totExpense);
+  document.getElementById('finProfit').textContent=fmt(profit);
+  document.getElementById('finProfit').style.color=profit>=0?'var(--green)':'var(--red)';
+  const pct=Math.min(100,Math.round(totIncome/FIN_GOAL*100));
+  document.getElementById('finProg').style.width=pct+'%';
+  document.getElementById('finPct').textContent=pct+'% z cíle';
+  document.getElementById('finLeft').textContent=fmt(Math.max(0,FIN_GOAL-totIncome))+' zbývá';
+  const el=document.getElementById('finList');
+  if(!finItems.length){el.innerHTML='<div class="empty">// žádné záznamy</div>';return;}
+  el.innerHTML=finItems.map((f,i)=>`<div class="food-item"><span>${f.name}<span class="badge ${f.type==='income'?'asset':'liability'}">${f.type==='income'?'příjem':'výdaj'}</span></span><span style="font-family:var(--mono);font-size:12px;color:${f.type==='income'?'var(--green)':'var(--red)'};">${f.type==='income'?'+':'−'}${f.val.toLocaleString('cs-CZ')} Kč <button class="del-btn" onclick="deleteFin(${i})">×</button></span></div>`).join('');
+}
+function addFin(){const n=document.getElementById('finName').value.trim();const v=parseInt(document.getElementById('finVal').value)||0;const t=document.getElementById('finType').value;if(!n||!v)return;finItems.push({name:n,val:v,type:t});set('finance_'+monthKey,finItems);renderFin();document.getElementById('finName').value='';document.getElementById('finVal').value='';}
+function deleteFin(i){finItems.splice(i,1);set('finance_'+monthKey,finItems);renderFin();}
+
+// ── JOURNAL ──────────────────────────────────────────────
+function renderJournal(){document.getElementById('journalText').value=localStorage.getItem('journal_'+todayKey)||'';}
+function saveJournal(){localStorage.setItem('journal_'+todayKey,document.getElementById('journalText').value);const s=document.getElementById('savedMsg');s.style.display='inline';setTimeout(()=>s.style.display='none',2000);}
+
+// ── START ─────────────────────────────────────────────────
+initPin();
+</script>
+</body>
+</html>
